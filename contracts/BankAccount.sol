@@ -30,7 +30,7 @@ contract BankAccount {
         bool approved;
     }
     struct Account {
-        addressp[] owners;
+        address[] owners;
         uint balance;
         mapping(uint => WithdrawRequest) withdrawRequests;
     }
@@ -43,8 +43,19 @@ contract BankAccount {
     uint nextAccountId;
     uint nextWithdrawId;
 
-    function deposit(uint accountId) external payable{
+    modifier accountOwner(uint accountId){
+        bool isOwner;
+        for(uint idx; idx < accounts[accountId].owners.length; idx++ ){
+            if(accounts[accountId].owners[idx] == msg.sender){
+                isOwner = true;
+                break;
+            }
+        }
+        require(isOwner,"you are not the owner of this account");
+    }
 
+    function deposit(uint accountId) external payable accountOwner(accountId){
+        accounts[accountId].balance += msg.value; 
     }
     // caller will specify otherOwners when creating the account 
     function createAccount(address[] calldata otherOwners) external {

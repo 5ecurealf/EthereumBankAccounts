@@ -99,6 +99,21 @@ contract BankAccount {
         );
         _;
     }
+    // check
+    // msg.sender is the owner of the withdrawal
+    // request is approved
+
+    modifier canWithdraw(uint accountId, uint withdrawId) {
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].user == msg.sender,
+            "you cannot withdraw this withdraw request"
+        );
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].approved == true,
+            "withdrawal not approved by all owners"
+        );
+        _;
+    }
 
     function deposit(uint accountId) external payable accountOwner(accountId) {
         accounts[accountId].balance += msg.value;
@@ -171,7 +186,22 @@ contract BankAccount {
         }
     }
 
-    function withdraw(uint accountId, uint withdrawId) external {}
+    // delete account clears the withdrawRequest's information so can't do the same withdrawal multiple times as address = 0
+    function withdraw(
+        uint accountId,
+        uint withdrawId
+    ) external canWithdraw(accountId, withdrawId) {
+        uint amount = accounts[accountId].withdrawRequests[withdrawId].amount;
+        require(accounts[accountId].balance >= amount, "insufficent balance"); // withdrawal may have happened already, so check enough funds in the account again
+        accounts[accountId].balance -= amount;
+
+        delete accounts[accountId].withdrawRequests[withdrawId];
+
+        (bool sent, ) = payable(msg.sender).call{value: amount}("");
+        require(sent);
+
+        emit Withdraw(withdrawId, block.timestamp);
+    }
 
     // getter functions for contract ease of use outside of the contract
     function getBalance(uint accountId) public view returns (uint) {}

@@ -73,6 +73,32 @@ contract BankAccount {
         require(amount <= accounts[accountId].balance, "insufficient funds");
         _;
     }
+    // check if
+    // - request is not already approved
+    // - person sending approval is not making the request
+    // - the request exists
+    // - msg.sender hasn't approved more than once
+    modifier canApprove(uint accountId, uint withdrawId) {
+        require(
+            !accounts[accountId].withdrawRequests[withdrawId].approved,
+            "this request is already approved"
+        );
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].user != msg.sender,
+            "you cannot approve this request"
+        );
+        require(
+            accounts[accountId].withdrawRequests[withdrawId].user != address(0),
+            "account does not exists"
+        );
+        require(
+            !accounts[accountId].withdrawRequests[withdrawId].ownersApproved[
+                msg.sender
+            ],
+            "you have already approved this request"
+        );
+        _;
+    }
 
     function deposit(uint accountId) external payable accountOwner(accountId) {
         accounts[accountId].balance += msg.value;
@@ -130,7 +156,20 @@ contract BankAccount {
         );
     }
 
-    function approveWtihdrawal(uint accountId, uint withdrawId) external {}
+    function approveWithdrawal(
+        uint accountId,
+        uint withdrawId
+    ) external accountOwner(accountId) canApprove(accountId, withdrawId) {
+        WithdrawRequest storage request = accounts[accountId].withdrawRequests[
+            withdrawId
+        ]; //reference to the request for readability
+        request.approvals++;
+        request.ownersApproved[msg.sender] = true;
+
+        if (request.approvals == accounts[accountId].owners.length - 1) {
+            request.approved = true;
+        }
+    }
 
     function withdraw(uint accountId, uint withdrawId) external {}
 

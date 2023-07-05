@@ -139,4 +139,19 @@ describe("BankAccount", function () {
       await expect(bankAccount.connect(addr0).createAccount([])).to.be.reverted;
     });
   });
+
+  describe("Despositing", () => {
+    it("should allow deposit from account owner", async () => {
+      const { bankAccount, addr0 } = await deployBankAccountWithAccounts(1);
+      await expect(
+        bankAccount.connect(addr0).deposit(0, { value: "100" })
+      ).to.changeEtherBalances([bankAccount, addr0], ["100", "-100"]);
+    });
+
+    it("should NOT allow deposit from non-account owner", async () => {
+      const { bankAccount, addr1 } = await deployBankAccountWithAccounts(1);
+      await expect(bankAccount.connect(addr1).deposit(0, { value: "100" })).to
+        .be.reverted;
+    });
+  });
 });

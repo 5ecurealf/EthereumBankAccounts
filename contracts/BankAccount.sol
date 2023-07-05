@@ -154,7 +154,7 @@ contract BankAccount {
 
     // user cannot request more funds than what is in the account
     // msg.sender has to be an owner of the account
-    function requestWithdrawl(
+    function requestWithdrawal(
         uint accountId,
         uint amount
     ) external accountOwner(accountId) sufficientBalance(accountId, amount) {

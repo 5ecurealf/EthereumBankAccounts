@@ -1,9 +1,6 @@
 pragma solidity >=0.4.22 <=0.8.19;
 
-// multi account owners
-// anyone can make deposits
-// anyone can request a withdrawal
-// all owners of account must approve the request
+// Multi-owner Bank Account Contract
 contract BankAccount {
     event Deposit(
         address indexed user,
@@ -45,6 +42,7 @@ contract BankAccount {
     uint nextAccountId;
     uint nextWithdrawId;
 
+    // Modifier to check if the caller is the owner of the account
     modifier accountOwner(uint accountId) {
         bool isOwner;
         for (uint idx; idx < accounts[accountId].owners.length; idx++) {
@@ -57,6 +55,9 @@ contract BankAccount {
         _;
     }
 
+    // Modifier to check if the owners of the account are valid. The owners are valid if there are no duplicate owners and
+    // the number of owners is less than or equal to 4 (including the account creator). It reverts with an error message if
+    // these conditions are not met
     modifier validOwners(address[] calldata owners) {
         require(owners.length + 1 <= 4, "maximum of 4 owners per account");
         for (uint256 i; i < owners.length; i++) {
@@ -72,15 +73,17 @@ contract BankAccount {
         _;
     }
 
+    // Modifier to check if the account has sufficient balance for a withdrawal.
+    // If the amount requested for withdrawal is less than or equal to the account balance, the
+    // function execution continues. If not, it reverts with an error message.
     modifier sufficientBalance(uint accountId, uint amount) {
         require(amount <= accounts[accountId].balance, "insufficient funds");
         _;
     }
-    // check if
-    // - request is not already approved
-    // - person sending approval is not making the request
-    // - the request exists
-    // - msg.sender hasn't approved more than once
+    // Modifier to check if a withdrawal can be approved. This is validated by checking that the request has not already been
+    // approved, that the person approving is not the one making the request, that the request exists, and that the approver
+    // has not already approved this request. If these conditions are met, the function execution continues. If not,
+    // it reverts with an error message.
     modifier canApprove(uint accountId, uint withdrawId) {
         require(
             !accounts[accountId].withdrawRequests[withdrawId].approved,
@@ -102,10 +105,10 @@ contract BankAccount {
         );
         _;
     }
-    // check
-    // msg.sender is the owner of the withdrawal
-    // request is approved
 
+    // Modifier to check if a withdrawal can be made. It checks if the sender is the owner of the withdrawal and that the
+    // withdrawal request has been approved by all owners. If these conditions are met, the function execution continues.
+    // If not, it reverts with an error message.
     modifier canWithdraw(uint accountId, uint withdrawId) {
         require(
             accounts[accountId].withdrawRequests[withdrawId].user == msg.sender,
@@ -118,15 +121,16 @@ contract BankAccount {
         _;
     }
 
+    // Function to deposit funds into an account. It increases the balance of the specified account by the sent value
+    // (msg.value). The function is only callable by an account owner.
     function deposit(uint accountId) external payable accountOwner(accountId) {
         accounts[accountId].balance += msg.value;
     }
 
-    // caller will specify otherOwners when creating the account
-    // limit of 4 owners of the account
-    // each owner passed is unique
-    // max 3 other accounts, make sure each owner doesn't own too many accounts
-
+    // Function to create a new account with multiple owners. The function caller is added as the last owner of the account.
+    // The account ID is generated and incrementally increased every time a new account is created. The function reverts if a
+    // user already owns more than 3 accounts. The function emits an 'AccountCreated' event with the owners, account ID,
+    // and timestamp. The function is callable by anyone.
     function createAccount(
         address[] calldata otherOwners
     ) external validOwners(otherOwners) {
@@ -152,8 +156,10 @@ contract BankAccount {
         }
     }
 
-    // user cannot request more funds than what is in the account
-    // msg.sender has to be an owner of the account
+    // Function to request a withdrawal from an account. A new withdrawal request is created with the sender as the user, and
+    // the amount requested for withdrawal. The withdrawal request ID is incrementally increased every time a new request is made.
+    // The function emits a 'WithdrawRequested' event with the sender, account ID, withdrawal request ID, amount, and timestamp.
+    // The function is only callable by an account owner.
     function requestWithdrawal(
         uint accountId,
         uint amount
@@ -174,6 +180,9 @@ contract BankAccount {
         );
     }
 
+    // Function to approve a withdrawal request. It increases the approvals count of the withdrawal request and marks the
+    // approver as having approved the request. If the approvals count is equal to the number of owners minus one (excluding the
+    // requester), the withdrawal request is marked as approved. The function is only callable by an account owner.
     function approveWithdrawal(
         uint accountId,
         uint withdrawId
@@ -189,7 +198,10 @@ contract BankAccount {
         }
     }
 
-    // delete account clears the withdrawRequest's information so can't do the same withdrawal multiple times as address = 0
+    // Function to withdraw funds from an account. It decreases the balance of the account by the amount to withdraw, deletes the
+    // withdrawal request to prevent re-entrancy attacks, sends the amount to the sender, and emits a 'Withdraw' event with the
+    // withdrawal request ID and timestamp. The function is only callable by an account owner who has a withdrawal request that
+    // has been approved by all other owners.
     function withdraw(
         uint accountId,
         uint withdrawId
@@ -206,15 +218,17 @@ contract BankAccount {
         emit Withdraw(withdrawId, block.timestamp);
     }
 
-    // getter functions for contract ease of use outside of the contract
+    // Getter function to get the balance of an account. Returns the balance of the specified account.
     function getBalance(uint accountId) public view returns (uint) {
         return accounts[accountId].balance;
     }
 
+    // Getter function to get the owners of an account. Returns an array of owner addresses of the specified account.
     function getOwners(uint accountId) public view returns (address[] memory) {
         return accounts[accountId].owners;
     }
 
+    // Getter function to get the approvals of a withdrawal request. Returns the number of approvals a withdrawal request has.
     function getApprovals(
         uint accountId,
         uint withdrawId
@@ -222,6 +236,7 @@ contract BankAccount {
         return accounts[accountId].withdrawRequests[withdrawId].approvals;
     }
 
+    // Getter function to get the accounts of the sender. Returns an array of account IDs that the sender is an owner of.
     function getAccounts() public view returns (uint[] memory) {
         return userAccounts[msg.sender];
     }
